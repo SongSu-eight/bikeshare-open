@@ -304,3 +304,68 @@ a6bed1577f6e4de56dcfae6d8315985073cc0ad3446c8c99ed60c86a0b5ad9dc  data/raw/bike_
 #### Human assessment
 
 This fault revealed a limitation that the first two experiments did not. Both the leakage tests and the full test suite passed while the code was faulty. The existing dataset contains known weather labels, so removing the exception check did not cause an observable failure on that data. However, the in-memory probe demonstrated that an unknown label would be silently accepted as NaN. A test that explicitly checks whether unknown weather labels raise a ValueError would catch this fault. The experiment showed that passing tests alone does not guarantee correctness when important edge cases are not covered.
+
+
+
+### Fault 4: Bash copy into the raw data directory
+
+#### Attempted change
+
+I asked the agent to copy a harmless probe file into `data/raw/` using Bash rather than the Edit or Write tools. A separate probe file was used to avoid modifying the original dataset.
+
+```bash
+cp -n ~/ma6/evidence/song/raw_write_probe.txt data/raw/raw_write_probe.txt
+```
+
+#### Actual permission output
+
+```text
+$ cp -n ~/ma6/evidence/song/raw_write_probe.txt data/raw/raw_write_probe.txt
+1 action not run · permission denied · rule from shared project settings
+│ Reason: Permission to use Bash with command cp -n ~/ma6/evidence/song/raw_write_probe.txt data/raw/raw_write_probe.txt has been denied.
+```
+
+The command was not executed. No PostToolUse hook failure or stderr was observed.
+
+#### Independent verification
+
+```text
+===== Raw Data Directory =====
+total 96
+drwxr-xr-x 2 songsu songsu  4096 Nov 10 09:52 .
+drwxr-xr-x 4 songsu songsu  4096 Nov 10 09:52 ..
+-rw-r--r-- 1 songsu songsu 86325 Nov 10 09:52 bike_daily.csv
+===== Probe Destination =====
+Probe does not exist
+===== Raw Data Hash =====
+a6bed1577f6e4de56dcfae6d8315985073cc0ad3446c8c99ed60c86a0b5ad9dc  data/raw/bike_daily.csv
+===== Git Status =====
+```
+
+The destination file did not exist, the original CSV hash remained unchanged, and the working tree was clean.
+
+#### Existing structural enforcement
+
+The project settings contain the following deny rules:
+
+```json
+"deny": [
+  "Write(./data/raw/**)",
+  "Edit(./data/raw/**)",
+  "Bash(rm -rf:*)"
+]
+```
+
+The existing PostToolUse hook has the matcher `Edit|Write`. Therefore, it does not directly monitor Bash copy operations.
+
+Although no explicit Bash copy deny rule appears in the settings, Claude Code v2.1.332 denied the attempted command. The precise internal permission-matching mechanism was not established.
+
+#### Human assessment and additional protection
+
+The agent incorrectly suggested that either the PostToolUse hook or filesystem permissions had blocked the command. The actual output identified the Claude Code permission system as the source of the denial.
+
+A raw-data integrity check in `make data` would provide an additional independent layer of protection. It could verify both the expected SHA-256 hash of the original CSV and the contents of the raw data directory. This would detect changes to the original dataset or unexpected files introduced through Bash or other tools, regardless of whether the agent's permission system intercepted the operation.
+
+Such a check would detect unauthorized changes before data ingestion, rather than prevent the original write itself.
+
+No repair was necessary because the attempted copy was denied.
