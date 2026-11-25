@@ -10,3 +10,5 @@ Agents append here via the `/new-feature` skill; you append here by hand.
 - Report mean and persistence baselines with every score. Persistence (test R^2 0.510, MAE 840) is within 0.07 R^2 of ridge and beats it on MAE; that caveat goes in the report.
 
 - 2026-11-24 (Huiyu): Added and retained `cnt_roll_std_7`, the sample standard deviation of demand over the previous seven calendar days. All inputs are known before the prediction day; calendar reindexing precedes shifting and rolling. Validation R2 changed from 0.6475 to 0.7224 for Ridge (+0.0749) and from 0.2185 to 0.0977 for HGB (-0.1208). Ridge MAE decreased from 832.9 to 700.4, while HGB MAE increased from 1296.6 to 1381.6. Both baselines were unchanged. Retained for the Ridge improvement. Test set was not scored.
+
+- 2026-11-24 (Huiyu): Explicitly classified all 18 raw columns and added a contract test to detect unclassified columns. An in-memory unknown numeric column correctly triggered an AssertionError. All 16 tests passed on the original data. This is a test-level guard, not a runtime ingestion restriction.

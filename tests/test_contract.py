@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from sklearn.metrics import r2_score
 
-from src.config import LAG_WARMUP, TARGET
+from src.config import CLASSIFIED_RAW_COLS, LAG_WARMUP, TARGET
 from src.features import build_features, feature_columns, reindex_to_calendar
 from src.ingest import load_raw
 from src.train import MODELS, temporal_split
@@ -56,3 +56,9 @@ def test_persistence_baseline_is_reported():
     """The baseline that matters for a lag-driven model is 'yesterday again'.
     It must be in the comparison, whatever its score."""
     assert "baseline_persistence" in MODELS
+
+
+def test_no_unclassified_raw_columns(raw):
+    """Every raw column must be explicitly classified."""
+    unknown = set(raw.columns) - CLASSIFIED_RAW_COLS
+    assert not unknown, f"Unclassified raw columns: {sorted(unknown)}"

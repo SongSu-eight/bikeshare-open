@@ -39,3 +39,20 @@ python -m pytest tests/ -q
 ...............                                                          [100%]
 15 passed in 1.22s
 ```
+
+## Unclassified Column Contract Test
+
+Injected an unknown numeric column into an in-memory DataFrame. The contract test correctly rejected it. The original CSV was unchanged.
+
+```text
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import runpy; from src.ingest import load_raw; test = runpy.run_path("tests/test_contract.py")["test_no_unclassified_raw_columns"]; test(load_raw().assign(unclassified_probe=1))
+                                                                                                                                        ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "tests/test_contract.py", line 64, in test_no_unclassified_raw_columns
+    assert not unknown, f"Unclassified raw columns: {sorted(unknown)}"
+           ^^^^^^^^^^^
+AssertionError: Unclassified raw columns: ['unclassified_probe']
+```
+
+After the probe: 16 tests passed. Raw CSV SHA256 remained unchanged.
