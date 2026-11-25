@@ -128,3 +128,71 @@ a6bed1577f6e4de56dcfae6d8315985073cc0ad3446c8c99ed60c86a0b5ad9dc  data/raw/bike_
 #### Human assessment
 
 The verification mechanism worked as intended. However, the agent incorrectly described the hook as blocking the edit and claimed that other forbidden columns entered the feature set. The actual change only allowed `casual` through. I checked the code and test output rather than relying on the agent's explanation. This experiment confirms that the existing test can detect a deliberate violation of the forbidden-column filter.
+
+
+
+### Fault 2: Missing shift in the rolling mean
+
+Skill used: `/seed-fault`
+
+#### Exact change
+
+In `src/features.py`, I deliberately removed `.shift(1)` from `cnt_roll_7` so that the rolling mean would include today's target value. All other features, including `cnt_roll_std_7`, were left unchanged.
+
+```diff
+- out["cnt_roll_7"] = out[TARGET].shift(1).rolling(LAG_WARMUP).mean()
++ out["cnt_roll_7"] = out[TARGET].rolling(LAG_WARMUP).mean()
+```
+
+#### Hook stderr (actual output)
+
+```text
+PostToolUse:Edit hook reported a problem
+[${CLAUDE_PROJECT_DIR}/.claude/hooks/check_leakage.sh]: Leakage tests failed after editing /home/songsu/ma6/bikeshare-open/src/features.py:
+[714 rows x 29 columns]
+
+    def test_rolling_mean_excludes_today(feats):
+        """cnt_roll_7 must be the mean of the 7 calendar days *before* today."""
+        by_date = feats.set_index("dteday")[TARGET]
+        date = feats.dteday.iloc[200]
+        window = [date - pd.Timedelta(days=k) for k in range(1, 8)]
+        if all(d in by_date.index for d in window):
+            expected = sum(by_date[d] for d in window) / 7
+>           assert feats.set_index("dteday").cnt_roll_7[date] == pytest.approx(expected)
+E           assert np.float64(4389.0) == 4414.857142857143 ± 0.00441486
+E
+E             comparison failed
+E             Obtained: 4389.0
+E             Expected: 4414.857142857143 ± 0.00441486
+
+tests/test_leakage.py:57: AssertionError
+=============================================== short test summary info ================================================
+FAILED tests/test_leakage.py::test_rolling_mean_excludes_today - assert np.float64(4389.0) == 4414.857142857143 ± 0.0...
+1 failed, 7 passed in 0.66s
+```
+
+#### Detection and repair
+
+The hook detected the fault immediately through `test_rolling_mean_excludes_today`. The calculated rolling mean was 4389.0 instead of the expected 4414.857142857143, showing that removing `.shift(1)` changed the feature calculation.
+
+After I recorded the failure and approved the repair, the agent restored `.shift(1)` without modifying other features or tests.
+
+Repair turns: 1, with explicit human guidance.
+
+#### Independent verification after repair
+
+```text
+python -m pytest tests/ -q
+................                                                         [100%]
+16 passed in 1.03s
+```
+
+The working tree was clean, and the raw CSV remained unchanged:
+
+```text
+a6bed1577f6e4de56dcfae6d8315985073cc0ad3446c8c99ed60c86a0b5ad9dc  data/raw/bike_daily.csv
+```
+
+#### Human assessment
+
+Unlike the first fault, the agent introduced the requested change correctly on its first attempt. The test caught the numerical difference, confirming that it checks whether the rolling mean uses strictly earlier observations. However, the agent again described the hook as blocking a commit. The hook actually reports failures after an edit rather than preventing commits. This experiment demonstrates that the existing test can detect temporal leakage even when the feature name and data type remain unchanged.
