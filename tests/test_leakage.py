@@ -64,3 +64,12 @@ def test_no_missing_values(feats):
 def test_dates_are_sorted_and_unique(feats):
     assert feats.dteday.is_monotonic_increasing
     assert feats.dteday.is_unique
+
+
+def test_rolling_std_excludes_today(feats):
+    """Verify sample std of the previous seven calendar days."""
+    date = pd.Timestamp("2011-08-01")
+    expected = 333.4868456033554
+    assert "cnt_roll_std_7" in feature_columns(feats)
+    actual = feats.set_index("dteday").loc[date, "cnt_roll_std_7"]
+    assert actual == pytest.approx(expected)
