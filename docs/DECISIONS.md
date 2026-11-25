@@ -31,3 +31,9 @@ Agents append here via the `/new-feature` skill; you append here by hand.
 - 2026-11-25 (Song): Updated CLAUDE.md to document raw-data integrity requirements, unknown-weather exception handling, and the /seed-fault workflow. These rules preserve the verification mechanisms and make future agent behavior consistent with the methodological contract.
 
 - 2026-11-25 (Song): Removed report-related ignore rules from .gitignore so that the required metrics and self-audit artifacts can be committed.
+
+- 2026-11-25 (Huiyu): Updated CLAUDE.md to require the seven-day rolling standard deviation to exclude today's demand and to require explicit classification of new raw columns.
+
+- 2026-11-25 (Team): Retained daily total ridership (cnt) as the forecasting target. Final demand growth of 63.39% and 104 of 184 test days exceeding the training maximum support the distribution-shift interpretation of HGB's weak test performance.
+
+- 2026-11-25 (Team): Prefer persistence for deployment when absolute daily forecasting error is the primary cost. Final Ridge test R2 is higher (0.6356 vs 0.5099), but its MAE is slightly worse (840.3 vs 840.1). Retain both in the reported comparison without further tuning.
