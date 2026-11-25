@@ -4,7 +4,7 @@ Daily Capital Bikeshare counts, 2011-2012. We forecast `cnt` (total daily
 rides) from calendar, weather, and lagged-demand features.
 
 ## Commands
-- `make data` - download raw CSV and assert its shape
+- `make data` - download raw CSV, verify integrity, and assert its shape
 - `make features` - build `data/processed/features.parquet`
 - `make train` - fit models, write `reports/metrics.json`
 - `make test` - pytest; run this before claiming anything works
@@ -27,6 +27,10 @@ rides) from calendar, weather, and lagged-demand features.
 - Report the mean baseline **and** the persistence baseline (yesterday's
   count) alongside every model. A negative R^2 is a finding, not a bug
   to hide.
+- Unknown weather labels must raise ValueError, never silently become NaN.
+- Never modify `data/raw/bike_daily.csv` or add files to `data/raw/`.
+- Preserve the raw-data integrity check in `src/ingest.py`.
+- Only approved model features may enter training; preserve the feature-set contract test.
 
 ## Style
 - Standard library, pandas, scikit-learn only. No new dependencies
@@ -43,3 +47,10 @@ rides) from calendar, weather, and lagged-demand features.
   cannot extrapolate to 2012. That is the headline result, not an error.
 - 2012-10-29 (Hurricane Sandy, 22 rides) is in the test set. Expect it in
   any residual plot.
+
+
+## Skills
+- `/new-feature <feature>` - add and verify a leakage-safe feature.
+- `/seed-fault <fault>` - introduce a controlled fault, record actual
+  failures, obtain human approval, repair, and verify.
+- Never weaken tests or hooks to make a seeded fault pass.
