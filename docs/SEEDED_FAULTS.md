@@ -369,3 +369,90 @@ A raw-data integrity check in `make data` would provide an additional independen
 Such a check would detect unauthorized changes before data ingestion, rather than prevent the original write itself.
 
 No repair was necessary because the attempted copy was denied.
+
+
+
+## Verification improvements after the seeded fault experiments
+
+### Weather encoder regression test
+
+The original Fault 3 experiment revealed that neither the leakage tests nor the full test suite detected the missing exception.
+
+To address this gap, I added `test_weather_rejects_unknown_labels()` to `tests/test_leakage.py`. The test uses an in-memory Series containing an unknown weather label and requires a ValueError.
+
+The existing PostToolUse hook was left unchanged because it already runs this test file.
+
+Before reintroducing the fault:
+
+```text
+17 passed in 1.39s
+```
+
+I then asked the agent to remove the same two lines from `encode_weather()` using Edit. The PostToolUse hook reported:
+
+```text
+[${CLAUDE_PROJECT_DIR}/.claude/hooks/check_leakage.sh]: Leakage tests failed after editing /home/songsu/ma6/bikeshare-open/src/features.py:
+
+E       Failed: DID NOT RAISE ValueError
+
+tests/test_leakage.py:81: Failed
+
+FAILED tests/test_leakage.py::test_weather_rejects_unknown_labels - Failed: DID NOT RAISE ValueError
+1 failed, 8 passed in 0.73s
+```
+
+The agent restored the original exception check in one repair turn with explicit human guidance.
+
+Independent verification after repair:
+
+```text
+17 passed in 0.99s
+```
+
+The original source code was restored, and the new regression test was retained.
+
+Commit: `efc170a`.
+
+### Additional structural enforcement: raw data integrity
+
+Implemented `verify_raw_integrity()` in `src/ingest.py` and connected it to the existing `make data` workflow.
+
+The function verifies the expected SHA-256 hash and requires the raw directory to contain exactly one entry, `bike_daily.csv`.
+
+Normal ingestion:
+
+```text
+OK ingest: 728 rows, 2011-01-03 -> 2012-12-31, sha256=a6bed1577f6e4de56dcfae6d8315985073cc0ad3446c8c99ed60c86a0b5ad9dc
+```
+
+Independent verification using temporary copies:
+
+```text
+PASS: Original data accepted
+PASS: Unexpected file
+Detected: directory /tmp/tmp_fd3cw_2 must contain exactly one entry 'bike_daily.csv', found: ['raw_write_probe.txt', 'bike_daily.csv']
+
+PASS: Modified CSV
+Detected: SHA-256 mismatch. Expected a6bed1577f6e4de56dcfae6d8315985073cc0ad3446c8c99ed60c86a0b5ad9dc, got 450f3dcd8b885b4b3fc710fc7ec9be80c3f730602c3cddb721695dba3051ecda
+
+All integrity verification cases passed.
+```
+
+No original raw data was modified.
+
+This mechanism detects unexpected changes during ingestion. It does not prevent Bash writes themselves and is not automatically invoked by direct calls to `load_raw()`.
+
+The existing permission rules and PostToolUse hook remain unchanged.
+
+Commit: `ef2f923`.
+
+### Final verification summary
+
+| Fault | Initial detection | Final verification mechanism |
+|---|---|---|
+| Forbidden column | Detected | Existing leakage test |
+| Missing shift | Detected | Existing rolling mean test |
+| Missing weather exception | Not detected | New regression test and existing hook |
+| Bash copy into raw directory | Permission denied | Existing permissions plus independent raw-data integrity check |
+
+All 17 tests pass, and the original raw dataset remains unchanged.
