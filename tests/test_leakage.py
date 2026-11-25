@@ -80,3 +80,29 @@ def test_weather_rejects_unknown_labels():
     probe = pd.Series(["GOOD", "UNKNOWN", "BAD"])
     with pytest.raises(ValueError, match="unmapped weather labels"):
         encode_weather(probe)
+
+
+def test_only_approved_features_enter_model(feats):
+    """Reject unexpected model inputs, including renamed leakage columns."""
+    expected = {
+        "temp",
+        "atemp",
+        "hum",
+        "windspeed",
+        "dayofweek",
+        "is_weekend",
+        "is_holiday",
+        "is_workday",
+        "month_sin",
+        "month_cos",
+        "weather_severity",
+        "cnt_lag_1",
+        "cnt_lag_7",
+        "cnt_roll_7",
+        "cnt_roll_std_7",
+    }
+    actual = set(feature_columns(feats))
+    assert actual == expected, (
+        f"Unexpected features: {sorted(actual - expected)}; "
+        f"Missing features: {sorted(expected - actual)}"
+    )
