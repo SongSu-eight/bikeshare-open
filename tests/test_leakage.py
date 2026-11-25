@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from src.config import FORBIDDEN, TARGET
-from src.features import build_features, feature_columns
+from src.features import build_features, feature_columns, encode_weather
 from src.ingest import load_raw
 
 
@@ -73,3 +73,10 @@ def test_rolling_std_excludes_today(feats):
     assert "cnt_roll_std_7" in feature_columns(feats)
     actual = feats.set_index("dteday").loc[date, "cnt_roll_std_7"]
     assert actual == pytest.approx(expected)
+
+
+def test_weather_rejects_unknown_labels():
+    """Unknown weather labels must raise an exception rather than become NaN."""
+    probe = pd.Series(["GOOD", "UNKNOWN", "BAD"])
+    with pytest.raises(ValueError, match="unmapped weather labels"):
+        encode_weather(probe)
