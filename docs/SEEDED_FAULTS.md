@@ -56,3 +56,75 @@ AssertionError: Unclassified raw columns: ['unclassified_probe']
 ```
 
 After the probe: 16 tests passed. Raw CSV SHA256 remained unchanged.
+
+
+
+## Exercise 2: Seeded Faults — Song
+
+### Fault 1: Forbidden column in the feature set
+
+Skill used: `/seed-fault`
+
+#### Exact change
+
+In `src/features.py`, I deliberately allowed `casual` to bypass the FORBIDDEN filter.
+
+```diff
+- return [c for c in numeric if c not in FORBIDDEN]
++ return [c for c in numeric if c not in FORBIDDEN or c == "casual"]
+```
+
+The agent initially proposed removing the entire FORBIDDEN filter. I rejected that edit because I wanted to test one forbidden column at a time.
+
+#### Hook stderr (actual output)
+
+```text
+PostToolUse:Edit hook reported a problem
+[${CLAUDE_PROJECT_DIR}/.claude/hooks/check_leakage.sh]: Leakage tests failed after editing /home/songsu/ma6/bikeshare-open/src/features.py:
+
+feats =         dteday  instant  season      yr mnth  ... weather_severity cnt_lag_1  cnt_lag_7   cnt_roll_7  cnt_roll_std_7
+0...0  WINTER  2012.0  DEC  ...              1.0    1796.0      920.0  1531.428571      887.135250
+
+[714 rows x 29 columns]
+
+    def test_no_forbidden_features(feats):
+        """Guards the gate, not the data: feature_columns() excludes FORBIDDEN by
+        construction, so this cannot discover a *new* leaky column. What it
+        catches is someone editing feature_columns() or FORBIDDEN -- which is
+        exactly the fault the Step 7 hook demonstrates."""
+        cols = set(feature_columns(feats))
+>       assert not (cols & FORBIDDEN), f"forbidden columns in feature set: {cols & FORBIDDEN}"
+E       AssertionError: forbidden columns in feature set: {'casual'}
+E       assert not ({'atemp', 'casual', 'cnt_lag_1', 'cnt_lag_7', 'cnt_roll_7', 'cnt_roll_std_7', ...} & {'casual', 'cnt', 'cnt_2d_bfr', 'days_since_2011', 'instant', 'registered', ...})
+
+tests/test_leakage.py:31: AssertionError
+=============================================== short test summary info ================================================
+FAILED tests/test_leakage.py::test_no_forbidden_features - AssertionError: forbidden columns in feature set: {'casual'}
+1 failed, 7 passed in 0.51s
+```
+
+#### Detection and repair
+
+The hook successfully detected the fault through `test_no_forbidden_features` and returned the failure to the agent. It did not prevent or undo the edit, since PostToolUse runs after the change has been made.
+
+The agent stopped and waited for my approval before repairing the fault. With one explicit repair instruction, it restored the original return statement without changing any tests or verification rules.
+
+Repair turns: 1, with explicit human guidance.
+
+#### Independent verification after repair
+
+```text
+python -m pytest tests/ -q
+................                                                         [100%]
+16 passed in 1.88s
+```
+
+The source code diff was empty. The raw CSV remained unchanged:
+
+```text
+a6bed1577f6e4de56dcfae6d8315985073cc0ad3446c8c99ed60c86a0b5ad9dc  data/raw/bike_daily.csv
+```
+
+#### Human assessment
+
+The verification mechanism worked as intended. However, the agent incorrectly described the hook as blocking the edit and claimed that other forbidden columns entered the feature set. The actual change only allowed `casual` through. I checked the code and test output rather than relying on the agent's explanation. This experiment confirms that the existing test can detect a deliberate violation of the forbidden-column filter.
