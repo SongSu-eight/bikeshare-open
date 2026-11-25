@@ -25,3 +25,9 @@ Agents append here via the `/new-feature` skill; you append here by hand.
 - 2026-11-25 (Song): Added a regression test requiring unknown weather labels to raise ValueError. The original fault passed all 16 tests; after adding the test, the same fault produced a PostToolUse hook failure. All 17 tests passed after repair.
 
 - 2026-11-25 (Team): Feature selection and target-transformation decisions are based on validation results only. The existing automated test-set performance assertion is retained as a fixed verification check, not as a criterion for tuning or selecting features. Final reported test metrics are generated after methodological decisions are finalized.
+
+- 2026-11-25 (Song): Added an independent feature-set contract test requiring exactly the 15 approved model inputs. A temporary copy of the forbidden casual column under the name innocent_feature triggered the PostToolUse hook. All 18 tests passed after repair. The feature set and modelling pipeline remain unchanged.
+
+- 2026-11-25 (Song): Updated CLAUDE.md to document raw-data integrity requirements, unknown-weather exception handling, and the /seed-fault workflow. These rules preserve the verification mechanisms and make future agent behavior consistent with the methodological contract.
+
+- 2026-11-25 (Song): Removed report-related ignore rules from .gitignore so that the required metrics and self-audit artifacts can be committed.

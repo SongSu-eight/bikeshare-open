@@ -456,3 +456,48 @@ Commit: `ef2f923`.
 | Bash copy into raw directory | Permission denied | Existing permissions plus independent raw-data integrity check |
 
 All 17 tests pass, and the original raw dataset remains unchanged.
+
+
+
+### Additional verification: renamed leakage column
+
+The existing forbidden-column test checks feature names against FORBIDDEN. A leaked column copied under an innocent name could therefore escape that test.
+
+To close this gap, I added `test_only_approved_features_enter_model()` in `tests/test_leakage.py`, using an independent set of the 15 approved features.
+
+Before introducing the fault:
+
+```text
+18 passed in 1.20s
+```
+
+The agent temporarily inserted the following line into `build_features()` using Edit:
+
+```diff
++    out["innocent_feature"] = out["casual"]
+```
+
+The PostToolUse hook detected the unexpected feature through `test_only_approved_features_enter_model`.
+
+Observed failure summary:
+
+```text
+tests/test_leakage.py:105: AssertionError
+1 failed, 9 passed in 0.55s
+```
+
+The original forbidden-column test did not fail, demonstrating why an independent feature-set contract is necessary.
+
+The agent removed the temporary leakage column in one repair turn with explicit human guidance.
+
+Independent verification after repair:
+
+```text
+18 passed in 1.40s
+```
+
+The original feature-building code was restored, and the raw CSV remained unchanged.
+
+This test detects unauthorized feature names, including renamed leakage columns. It does not guarantee detection of leakage introduced through modifications to the values of existing approved features.
+
+Commit: `1dd5ada`.

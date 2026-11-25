@@ -30,6 +30,7 @@ rides) from calendar, weather, and lagged-demand features.
 - Unknown weather labels must raise ValueError, never silently become NaN.
 - Never modify `data/raw/bike_daily.csv` or add files to `data/raw/`.
 - Preserve the raw-data integrity check in `src/ingest.py`.
+- Only approved model features may enter training; preserve the feature-set contract test.
 
 ## Style
 - Standard library, pandas, scikit-learn only. No new dependencies
