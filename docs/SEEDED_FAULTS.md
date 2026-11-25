@@ -196,3 +196,111 @@ a6bed1577f6e4de56dcfae6d8315985073cc0ad3446c8c99ed60c86a0b5ad9dc  data/raw/bike_
 #### Human assessment
 
 Unlike the first fault, the agent introduced the requested change correctly on its first attempt. The test caught the numerical difference, confirming that it checks whether the rolling mean uses strictly earlier observations. However, the agent again described the hook as blocking a commit. The hook actually reports failures after an edit rather than preventing commits. This experiment demonstrates that the existing test can detect temporal leakage even when the feature name and data type remain unchanged.
+
+
+
+### Fault 3: Missing exception in the weather encoder
+
+Skill used: `/seed-fault`
+
+#### Exact change
+
+In `src/features.py`, I deliberately removed the exception check from `encode_weather()` to see whether the verification system could detect the loss of protection against unknown weather labels.
+
+```diff
+-    if unknown:
+-        raise ValueError(f"unmapped weather labels: {sorted(unknown)}")
+```
+
+#### Baseline test output
+
+```text
+python -m pytest tests/ -q
+................                                                         [100%]
+16 passed in 1.99s
+```
+
+#### Hook stderr
+
+No hook failure or stderr was observed after the edit. Unlike the previous two faults, this change was not detected by the existing leakage tests.
+
+#### Independent test output with the fault present
+
+```text
+........                                                                                                         [100%]
+8 passed in 0.60s
+```
+
+Full test suite:
+
+```text
+python -m pytest tests/ -q
+................                                                                                                 [100%]
+16 passed in 1.37s
+```
+
+No existing test failed, even though the exception check had been removed.
+
+#### Additional verification
+
+To understand why the tests still passed, I called `encode_weather()` with an unknown weather label using an in-memory Series. No raw data was modified.
+
+```python
+probe = pd.Series(["GOOD", "UNKNOWN", "BAD"])
+print(encode_weather(probe))
+```
+
+Actual output:
+
+```text
+Input:
+0       GOOD
+1    UNKNOWN
+2        BAD
+dtype: str
+
+Encoded output:
+0    0.0
+1    NaN
+2    2.0
+dtype: float64
+```
+
+The unknown label was silently converted to NaN instead of raising an exception. In the feature pipeline, this could cause a row to be silently removed by the subsequent dropna() operation.
+
+#### Detection and repair
+
+The agent attempted to stage the faulty file and later tried to execute the hook script directly without its required payload. I rejected these requests and ran the tests independently.
+
+After recording the verification gap, I instructed the agent to restore the original exception check.
+
+Repair turns: 1, with explicit human guidance.
+
+#### Independent verification after repair
+
+```text
+python -m pytest tests/ -q
+................                                                         [100%]
+16 passed in 1.81s
+```
+
+The same unknown-weather probe was repeated:
+
+```text
+Input:
+0       GOOD
+1    UNKNOWN
+2        BAD
+dtype: str
+PASS: ValueError("unmapped weather labels: ['UNKNOWN']")
+```
+
+The working tree was clean, and the raw CSV remained unchanged:
+
+```text
+a6bed1577f6e4de56dcfae6d8315985073cc0ad3446c8c99ed60c86a0b5ad9dc  data/raw/bike_daily.csv
+```
+
+#### Human assessment
+
+This fault revealed a limitation that the first two experiments did not. Both the leakage tests and the full test suite passed while the code was faulty. The existing dataset contains known weather labels, so removing the exception check did not cause an observable failure on that data. However, the in-memory probe demonstrated that an unknown label would be silently accepted as NaN. A test that explicitly checks whether unknown weather labels raise a ValueError would catch this fault. The experiment showed that passing tests alone does not guarantee correctness when important edge cases are not covered.
