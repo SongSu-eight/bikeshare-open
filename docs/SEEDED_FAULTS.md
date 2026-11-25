@@ -446,7 +446,7 @@ The existing permission rules and PostToolUse hook remain unchanged.
 
 Commit: `ef2f923`.
 
-### Final verification summary
+### Verification summary before the renamed leakage test
 
 | Fault | Initial detection | Final verification mechanism |
 |---|---|---|
